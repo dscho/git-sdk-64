@@ -88,7 +88,7 @@ jobs:
           path: ${{github.workspace}}
       - name: uncompress git-artifacts
         shell: bash
-        run: tar -C .. -xJf git-artifacts.tar.xz
+        run: tar -C .. -xJvf git-artifacts.tar.xz
       - name: test
         run: |
           & .\minimal-sdk\usr\bin\bash.exe -lc @"
