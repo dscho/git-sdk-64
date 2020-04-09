@@ -1,19 +1,16 @@
 name: ci-artifacts
 
 on:
-  push:
-    branches:
-      - master
+  - push
 
 env:
   LC_CTYPE: C.UTF-8
 
 jobs:
   ci-artifact:
-    if: github.event.repository.fork == false
     strategy:
       matrix:
-        artifact: [full-sdk, build-installers, makepkg-git]
+        artifact: [build-installers]
     runs-on: windows-latest
     steps:
       - name: clone git-sdk-64
