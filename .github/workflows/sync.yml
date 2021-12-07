@@ -8,6 +8,9 @@ on:
       debug_with_ssh_key:
         description: 'Public SSH key to use to debug failures'
         required: false
+  push:
+    branches:
+      - test
 
 env:
   GIT_CONFIG_PARAMETERS: "'user.name=Git for Windows Build Agent' 'user.email=ci@git-for-windows.build' 'windows.sdk64.path=${{ github.workspace }}' 'windows.sdk32.path=' 'http.sslbackend=schannel' 'core.autocrlf=false' 'checkout.workers=16'"
@@ -16,7 +19,6 @@ env:
 
 jobs:
   sync:
-    if: github.event.repository.fork == false || github.event.inputs.debug_with_ssh_key != ''
     runs-on: windows-latest
     environment: sync
     steps:
