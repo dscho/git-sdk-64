@@ -2,15 +2,12 @@ name: ci-artifacts
 
 on:
   push:
-    branches:
-      - main
 
 env:
   LC_CTYPE: C.UTF-8
 
 jobs:
   minimal-sdk-artifact:
-    if: github.event.repository.fork == false
     runs-on: windows-latest
     steps:
       - name: clone git-sdk-64
@@ -23,6 +20,15 @@ jobs:
       - name: build git-sdk-64-minimal-sdk
         shell: bash
         run: sh -x ./build-extra/please.sh create-sdk-artifact --sdk=git-sdk-64.git minimal-sdk
+      - name: replace msys2-runtime
+        shell: bash
+        run: |
+          curl  -Lo /tmp/msys2-runtime.zip \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+            https://api.github.com/repos/dscho/msys2-runtime/actions/artifacts/352801589/zip &&
+          unzip -v /tmp/msys2-runtime.zip &&
+          unzip -p /tmp/msys2-runtime.zip usr/bin/msys-2.0.dll >minimal-sdk/usr/bin/msys-2.0.dll
       - name: compress artifact
         shell: bash
         run: (cd minimal-sdk && tar cvf - * .[0-9A-Za-z]*) | xz -9 >git-sdk-64-minimal.tar.xz
