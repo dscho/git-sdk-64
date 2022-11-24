@@ -4,7 +4,6 @@ on: [workflow_dispatch, push]
 
 jobs:
   test-nano-server:
-    if: github.event.repository.fork == false || github.event_name == 'workflow_dispatch'
     runs-on: windows-2022
     env:
       REF: ${{github.ref}}
