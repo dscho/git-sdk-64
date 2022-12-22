@@ -2,8 +2,6 @@ name: git-artifacts
 
 on:
   push:
-    branches:
-      - main
 
 env:
   REPOSITORY: git-for-windows/git
@@ -19,7 +17,6 @@ env:
 
 jobs:
   build:
-    if: github.event.repository.fork == false
     runs-on: windows-latest
     steps:
       - name: Configure user
@@ -45,7 +42,7 @@ jobs:
           REF: ${{github.ref}}
       - name: clone build-extra
         shell: bash
-        run: git clone --depth=1 --single-branch -b main https://github.com/git-for-windows/build-extra
+        run: git clone --depth=1 -b drop-obsolete-parts-from-please.sh https://github.com/dscho/build-extra && git -C build-extra branch -M main && git -C build-extra fetch --depth=50 origin main:refs/remotes/origin/main
       - name: create build-installers artifact
         shell: bash
         run: |
