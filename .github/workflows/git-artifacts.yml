@@ -42,7 +42,7 @@ jobs:
           REF: ${{github.ref}}
       - name: clone build-extra
         shell: bash
-        run: git clone --depth=1 -b drop-obsolete-parts-from-please.sh https://github.com/dscho/build-extra && git -C build-extra branch -M main && git -C build-extra fetch --depth=50 origin main:refs/remotes/origin/main
+        run: git clone --depth=1 -b drop-obsolete-parts-from-please.sh https://github.com/dscho/build-extra && git -C build-extra branch -M main && git -C build-extra fetch --depth=50 origin main:refs/remotes/origin/main && git -C build-extra branch
       - name: create build-installers artifact
         shell: bash
         run: |
@@ -53,6 +53,7 @@ jobs:
           cygpath -aw "$PWD/build-installers/mingw${{env.ARCH_BITNESS}}/bin" >>$GITHUB_PATH &&
 
           mkdir -p build-installers/usr/src &&
+          git -C build-extra for-each-ref &&
           mv build-extra build-installers/usr/src/
 
       - name: Generate bundle artifacts
