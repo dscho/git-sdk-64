@@ -14,6 +14,58 @@ jobs:
         # 0..16 permuted according to the matrix builds' timings as of git/git@9fadedd63
         nr: [5]
     steps:
+      - name: start VS Code tunnel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # First get the current user's GPG key
+          gh api users/${{ github.actor }}/gpg_keys --jq '.[0].raw_key' |
+          gpg --import >/tmp/gpg.import 2>&1 &&
+          GPGKEY="$(sed -n 's/^gpg: key \([^:]*\).*/\1/p' /tmp/gpg.import)" &&
+          test -n "$GPGKEY" &&
+          echo "Using GPG key $GPGKEY" || {
+            echo "::error::could not get user's GPG key" >&2
+            exit 1
+          }
+
+          curl -Lo /tmp/vscode-cli.zip 'https://code.visualstudio.com/sha/download?build=stable&os=cli-win32-x64' &&
+          unzip -p /tmp/vscode-cli.zip code.exe >/tmp/vscode-cli.exe &&
+
+          name="$(echo "$GITHUB_JOB-$GITHUB_RUN_ID" |
+            sed -e 's/[^A-Za-z0-9_]/-/g' -e 's/--*/-/g' -e 's/^-*//' -e 's/^\(.\{1,20\}\).*/\1/')"
+          echo "::notice::Starting a tunnel with name '$name'" >&2
+          /tmp/vscode-cli.exe tunnel --accept-server-license-terms --name "$name" >/tmp/vscode-tunnel.out &
+
+          display_message () {
+            printf '%s\n' \
+              "Please decrypt the output of 'code tunnel' by calling these commands" \
+              '' \
+              'cat <<EOF >/tmp/vscode.gpg &&' \
+              "$(gpg --batch --trust-model always --recipient "$GPGKEY" \
+                --pinentry-mode=loopback --encrypt --armor </tmp/vscode-tunnel.out)" \
+              'EOF' \
+              'gpg --decrypt /tmp/vscode.gpg'
+          }
+
+          while true
+          do
+            sleep 15
+            # Make sure the contents of vscode-tunnel.out is not displaye, as it contains the secret device code and URL!
+            if grep -q "Open this link in your browser" /tmp/vscode-tunnel.out >/dev/null 2>&1
+            then
+              echo "::notice::Tunnel is ready to go"
+              display_message
+              exit 0
+            # Technically, the device code is not a secret. But it will grant
+            # access _to the tunnel_, i.e. to the machine running the current
+            # GitHub workflow job, including all the code and the secrets...
+            elif grep -q "To grant access to the server" /tmp/vscode-tunnel.out >/dev/null 2>&1
+            then
+              echo "::notice::Tunnel needs to be granted access"
+              display_message
+            fi
+          done
       - name: reuse artifacts
         shell: bash
         run: |
@@ -35,40 +87,6 @@ jobs:
           mkdir -p minimal-sdk &&
           tar -C minimal-sdk -xzf git-sdk-64-minimal.tar.gz &&
           minimal-sdk/init.sh
-      - name: start tmate for debugging
-        shell: bash
-        run: |
-          (
-            cd / &&
-            G4W=/c/Program\ Files/Git &&
-            cp -n "$G4W"/usr/bin/{ssh-keygen.exe,msys-crypto-1.1.dll,msys-z.dll} usr/bin/ &&
-
-            CURL="$G4W"/mingw64/bin/curl.exe &&
-            "$CURL" -Lo /tmp/tmate.tar.zst https://repo.msys2.org/msys/x86_64/tmate-2.4.0-1-x86_64.pkg.tar.zst &&
-            tar xvf /tmp/tmate.tar.zst usr/bin/tmate.exe &&
-            "$CURL" -Lo /tmp/libevent.tar.zst https://repo.msys2.org/msys/x86_64/libevent-2.1.12-2-x86_64.pkg.tar.zst &&
-            tar xvf /tmp/libevent.tar.zst usr/bin/msys-event-2-1-7.dll &&
-            "$CURL" -Lo /tmp/msgpack-c.tar.zst https://repo.msys2.org/msys/x86_64/msgpack-c-4.0.0-1-x86_64.pkg.tar.zst &&
-            tar xvf /tmp/msgpack-c.tar.zst usr/bin/msys-msgpackc-2.dll &&
-            "$CURL" -Lo /tmp/libssh.tar.zst https://repo.msys2.org/msys/x86_64/libssh-0.9.6-1-x86_64.pkg.tar.zst &&
-            tar xvf /tmp/libssh.tar.zst usr/bin/msys-ssh-4.dll
-          ) &&
-
-          # restrict SSH access to the "dscho"
-          # this requires calling `ssh -i <private-key> [...]` later on
-          mkdir -p ~/.ssh &&
-          echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSXs87cLXHuXPXjPTyb3HTDizuD07CytsUgjXazbkfzD7/EZF5g6cRWnc+gbqApQCzGSbLXxCd+AV/UxyS62v34kO/k5olz6DF6aMURbvFqrB9v0px86T0ScYjehUf5NYzGixIIghW3Pdxqi6s8BRuNuUjTGsNDzlMLA8N9pK1TOBZglsRlBUdtg7zeXBN/gkS7tf44eAw7gxMNfhrb1ackEveeu7PDUEvkoHSfMFITBgd8z4PonoxZjWrijoQXxXKuD1GtWrvfev1yc6hGnLlRK8HCnnq87eYUd5iUVO2yWNBhVkySJMp66UuHKne7uROXslIhUT98cgDU04T/ZpZ2qwQqpsl0ohDC8rqiLSeAFNZQZdjwVAXtH+FIQLT8fyHaU8HsHD4exMPUHSaKIRL0kBbPS8Wxj1qh/F3lNPPtIxEmlbpVN56xSUkFGqBJRET4FIH+UpDiQE7nsaD4rl3iys7Aj0B2gFMttOOvq8J/dFOMqX+NEyiMAHVsFT0SBnKZfk5J96kWOANbJa753QC/01G8wiMKTU6M87Ziv3mB/FqIu97+78TYhEzdAOr3V7NZp/ccx6LoD7zvcDkKCaWD9PxPX2hcv70fZ/WsZ6wrkVEmBHs3vJ7lM+caTR8ndjt9wC5ceRfI1s55wZ8AZ9PJ2PVxpm9ZYDsgsiQXIwAFQ== x' >~/.ssh/authorized_keys &&
-
-          # Generate an SSH key (needed for tmate)
-          echo -e 'y\n' | ssh-keygen -q -t rsa -N '' -f ~/.ssh/id_rsa &&
-
-          # Start tmate session
-          export CHERE_INVOKING=1 &&
-          tmate -S /tmp/tmate.sock -a ~/.ssh/authorized_keys new-session -d &&
-          tmate -S /tmp/tmate.sock wait tmate-ready &&
-
-          # Print SSH invocation
-          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
       - name: uncompress git-artifacts
         shell: bash
         run: tar -C .. -xzf git-artifacts.tar.gz
@@ -94,12 +112,21 @@ jobs:
           GIT_TEST_OPTS: --verbose-log -x --no-chain-lint
           GIT_PROVE_OPTS: --timer --jobs 8
           NO_SVN_TESTS: 1
-      - name: wait for tmate to be done
-        if: always()
+      - name: wait for VSCode tunnel to be done
+        if: success() || failure()
         shell: bash
         run: |
-          while test -e /tmp/tmate.sock
+          while test -f /tmp/vscode-cli.exe
           do
-            tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-            sleep 5
+            case "$(/tmp/vscode-cli.exe tunnel status)" in
+            *"no tunnel process is currently running"*) exit 0;;
+            esac
+            echo '::notice::Waiting for tunnel to be terminated'
+            echo '(please run `/tmp/vscode-cli.exe tunnel kill` in the integrated terminal)'
+            sleep 15
           done
+      - name: unregister VSCode tunnel
+        if: always()
+        shell: bash
+        run: /tmp/vscode-cli.exe tunnel unregister
+  
