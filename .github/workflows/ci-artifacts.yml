@@ -69,8 +69,8 @@ jobs:
             git --git-dir=git-sdk-64.git show HEAD:$path >${path##*/}
           done &&
           mkdir minimal-sdk-extra &&
-          (cd minimal-sdk && ../7z.exe a -mx9 ../minimal-sdk-extra/git-sdk-x86_64-minimal.zip * .?*) &&
-          (cd minimal-sdk && ../7z.exe a -t7z -m0=lzma -mqs -mlc=8 -mx=9 -md=256M -mfb=273 -ms=256M -sfx../7zCon.sfx \
+          (cd minimal-sdk && ../7z.exe a -mmt=on -mx9 ../minimal-sdk-extra/git-sdk-x86_64-minimal.zip * .?*) &&
+          (cd minimal-sdk && ../7z.exe a -t7z -mmt=on -m0=lzma -mqs -mlc=8 -mx=9 -md=256M -mfb=273 -ms=256M -sfx../7zCon.sfx \
             ../minimal-sdk-extra/git-sdk-x86_64-minimal.7z.exe * .?*)
       - name: upload minimal-sdk-extra artifacts
         # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
