@@ -3,8 +3,6 @@ name: git-artifacts
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
 
 env:
   REPOSITORY: git-for-windows/git
@@ -20,7 +18,6 @@ env:
 
 jobs:
   build:
-    if: github.event.repository.fork == false || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - name: Configure user
