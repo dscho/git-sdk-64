@@ -3,7 +3,7 @@ name: ci-artifacts
 on:
   push:
     branches:
-      - main
+      - tmp
   pull_request:
 
 # For the continuous `ci-artifacts` release
@@ -15,7 +15,6 @@ env:
 
 jobs:
   minimal-sdk-artifact:
-    if: github.event.repository.fork == false
     runs-on: windows-latest
     outputs:
       git-artifacts-extract-location: ${{ steps.git-artifacts-extract-location.outputs.result }}
@@ -35,6 +34,15 @@ jobs:
         run: |
           sh -x ./build-extra/please.sh create-sdk-artifact --architecture=ucrt64 --sdk=git-sdk-64.git minimal-sdk &&
           cygpath -aw minimal-sdk/usr/bin >>$GITHUB_PATH
+      - name: work around OpenSSL v4.1 deprecation
+        shell: bash
+        run: |
+          set -ex
+          header=minimal-sdk/ucrt64/include/openssl/asn1.h
+          needle='^OSSL_DEPRECATED.*ASN1_STRING_get_length'
+          ! grep -q "$needle" "$header" ||
+          sed -i "s/$needle/\/\/ &/" "$header"
+          grep -n ASN1_STRING.*length "$header"
       - name: compress artifact
         shell: bash
         run: (cd minimal-sdk && tar cvf - * .[0-9A-Za-z]*) | gzip -1 >git-sdk-x86_64-minimal.tar.gz
